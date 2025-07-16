@@ -1,0 +1,1374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>战士对决 - 双人对战游戏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        player1: '#3B82F6', // 蓝色角色主色
+                        player1Accent: '#93C5FD', // 蓝色角色辅助色
+                        player1Energy: '#60A5FA', // 蓝色角色能量色
+                        player2: '#EF4444', // 红色角色主色
+                        player2Accent: '#FECACA', // 红色角色辅助色
+                        player2Energy: '#F87171', // 红色角色能量色
+                        arena: '#1F2937',   // 竞技场背景
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .character-shadow {
+                filter: drop-shadow(0 4px 3px rgb(0 0 0 / 0.2)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.1));
+            }
+            .arena-gradient-1 {
+                background: linear-gradient(135deg, #1F2937 0%, #374151 100%);
+            }
+            .arena-gradient-2 {
+                background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            }
+            .arena-gradient-3 {
+                background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            }
+            .health-bar {
+                transition: width 0.3s ease-in-out;
+            }
+            .energy-bar {
+                transition: width 0.2s ease-in-out;
+            }
+            .walk-animation {
+                animation: walkCycle 0.5s steps(2) infinite;
+            }
+            .player1-attack {
+                animation: player1Attack 0.4s ease-out;
+            }
+            .player2-attack {
+                animation: player2Attack 0.4s ease-out;
+            }
+            .hit-reaction {
+                animation: hitReaction 0.4s ease-in-out;
+            }
+            .hit-impact {
+                animation: hitImpact 0.3s ease-out;
+            }
+            .defend-effect {
+                animation: defend 0.5s ease-in-out infinite;
+            }
+            .jump-effect {
+                animation: jump 0.5s ease-in-out;
+            }
+            .player1-weapon {
+                transition: transform 0.2s ease-out;
+            }
+            .special-effect {
+                animation: specialEffect 0.8s ease-out;
+            }
+            .floating-item {
+                animation: float 3s ease-in-out infinite;
+            }
+            .level-transition {
+                animation: levelTransition 1s ease-in-out;
+            }
+            .countdown {
+                animation: countdown 1s ease-in-out;
+            }
+        }
+        
+        @keyframes walkCycle {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+            100% { transform: translateX(0); }
+        }
+        
+        @keyframes player1Attack {
+            0% { transform: translateX(0); }
+            30% { transform: translateX(30px) scale(1.1); }
+            70% { transform: translateX(20px); }
+            100% { transform: translateX(0); }
+        }
+        
+        @keyframes player2Attack {
+            0% { transform: translateX(0); }
+            30% { transform: translateX(-30px) scale(1.1); }
+            70% { transform: translateX(-20px); }
+            100% { transform: translateX(0); }
+        }
+        
+        @keyframes hitReaction {
+            0% { transform: translateX(0); }
+            20% { transform: translateX(15px) rotate(8deg); opacity: 0.7; }
+            50% { transform: translateX(-10px) rotate(-5deg); opacity: 0.7; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes hitImpact {
+            0% { transform: scale(0); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.8; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        
+        @keyframes defend {
+            0% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(255, 255, 255, 0.8); }
+            100% { box-shadow: 0 0 5px rgba(255, 255, 255, 0.5); }
+        }
+        
+        @keyframes jump {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-30px); }
+            100% { transform: translateY(0); }
+        }
+        
+        @keyframes specialEffect {
+            0% { transform: scale(0.5); opacity: 0.8; }
+            50% { transform: scale(2); opacity: 0.6; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0); }
+        }
+        
+        @keyframes levelTransition {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes countdown {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.8; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="max-w-4xl w-full mx-auto">
+        <!-- 游戏标题和导航 -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-white">
+                <i class="fa fa-shield mr-2"></i>战士对决
+            </h1>
+            <div class="flex gap-2">
+                <button id="sound-btn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-3 rounded-full text-sm transition">
+                    <i class="fa fa-volume-up mr-1"></i>音效
+                </button>
+                <button id="menu-btn" class="bg-gray-700 hover:bg-gray-600 text-white py-1 px-3 rounded-full text-sm transition">
+                    <i class="fa fa-bars mr-1"></i>菜单
+                </button>
+            </div>
+        </div>
+        
+        <!-- 游戏状态面板 -->
+        <div class="flex justify-between mb-4 px-4">
+            <div class="w-1/3">
+                <div class="flex justify-between text-sm text-white mb-1">
+                    <span>玩家1 (剑士)</span>
+                    <span id="player1-score" class="bg-blue-800 px-2 rounded">0分</span>
+                </div>
+                <!-- 生命值 -->
+                <div class="h-4 bg-gray-700 rounded-full overflow-hidden mb-2">
+                    <div id="player1-health" class="h-full bg-player1 health-bar w-full"></div>
+                </div>
+                <!-- 能量值 -->
+                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="player1-energy" class="h-full bg-player1Energy energy-bar w-0"></div>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">
+                    <span>移动: A(左) D(右) | 攻击: J | 防御: S | 跳跃: W | 大招: K</span>
+                </div>
+            </div>
+            
+            <div class="text-white flex flex-col items-center justify-center">
+                <div class="flex items-center gap-2 mb-1">
+                    <span id="round" class="bg-gray-700 px-3 py-1 rounded-full text-sm">第1回合</span>
+                    <span id="level" class="bg-purple-700 px-3 py-1 rounded-full text-sm">Level 1</span>
+                </div>
+                <span id="message" class="font-bold text-lg">准备战斗!</span>
+            </div>
+            
+            <div class="w-1/3">
+                <div class="flex justify-between text-sm text-white mb-1">
+                    <span>玩家2 (拳师)</span>
+                    <span id="player2-score" class="bg-red-800 px-2 rounded">0分</span>
+                </div>
+                <!-- 生命值 -->
+                <div class="h-4 bg-gray-700 rounded-full overflow-hidden mb-2">
+                    <div id="player2-health" class="h-full bg-player2 health-bar w-full"></div>
+                </div>
+                <!-- 能量值 -->
+                <div class="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div id="player2-energy" class="h-full bg-player2Energy energy-bar w-0"></div>
+                </div>
+                <div class="text-xs text-gray-400 mt-1 text-right">
+                    <span>移动: ←(左) →(右) | 攻击: 1 | 防御: ↓ | 跳跃: ↑ | 大招: 2</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 战斗场地 -->
+        <div id="arena" class="arena-gradient-1 rounded-lg h-[400px] relative overflow-hidden border-4 border-gray-700">
+            <!-- 地面 -->
+            <div class="absolute bottom-0 left-0 right-0 h-8 bg-gray-800"></div>
+            
+            <!-- 装饰元素 -->
+            <div class="absolute top-10 left-10 w-16 h-16 bg-gray-700 rounded-full opacity-50"></div>
+            <div class="absolute top-20 right-16 w-20 h-20 bg-gray-700 rounded-full opacity-50"></div>
+            <div class="absolute bottom-32 left-1/4 w-12 h-12 bg-gray-700 rounded-full opacity-50"></div>
+            
+            <!-- 可收集物品 -->
+            <div id="energy-item" class="hidden floating-item absolute w-8 h-8 bg-yellow-400 rounded-full border-2 border-yellow-600 z-10 cursor-default"></div>
+            <div id="health-item" class="hidden floating-item absolute w-8 h-8 bg-green-400 rounded-full border-2 border-green-600 z-10 cursor-default">
+                <i class="fa fa-heart text-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></i>
+            </div>
+            
+            <!-- 玩家1 (剑士) -->
+            <div id="player1" class="absolute bottom-8 left-[20%] w-16 h-32 character-shadow z-10">
+                <div class="w-full h-full relative">
+                    <!-- 头部 -->
+                    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 w-10 h-10 bg-player1 rounded-full border-2 border-black">
+                        <!-- 眼睛 -->
+                        <div class="absolute top-3 right-2 w-2 h-2 bg-black rounded-full"></div>
+                    </div>
+                    <!-- 头盔 -->
+                    <div class="absolute -top-2 left-1/2 transform -translate-x-1/2 w-12 h-8 bg-player1Accent rounded-t-lg border-2 border-black"></div>
+                    <!-- 身体 -->
+                    <div class="absolute top-10 left-1/2 transform -translate-x-1/2 w-12 h-16 bg-player1 rounded-md border-2 border-black"></div>
+                    <!-- 手臂 -->
+                    <div class="absolute top-12 left-0 w-6 h-4 bg-player1 border-2 border-black rounded"></div>
+                    <div class="absolute top-12 right-0 w-6 h-4 bg-player1 border-2 border-black rounded"></div>
+                    <!-- 腿部 -->
+                    <div class="absolute bottom-0 left-2 w-5 h-8 bg-player1 border-2 border-black rounded"></div>
+                    <div class="absolute bottom-0 right-2 w-5 h-8 bg-player1 border-2 border-black rounded"></div>
+                    <!-- 剑 (武器) -->
+                    <div id="player1-weapon" class="player1-weapon absolute top-12 right-0 w-16 h-3 bg-gray-700 border-2 border-black rounded"></div>
+                </div>
+            </div>
+            
+            <!-- 玩家2 (拳师) -->
+            <div id="player2" class="absolute bottom-8 right-[20%] w-16 h-32 character-shadow z-10">
+                <div class="w-full h-full relative relative">
+                    <!-- 头部 -->
+                    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 w-10 h-10 bg-amber-700 rounded-full border-2 border-black">
+                        <!-- 眼睛 -->
+                        <div class="absolute top-3 left-2 w-2 h-2 bg-black rounded-full"></div>
+                        <!-- 嘴巴 -->
+                        <div class="absolute top-6 left-1/2 transform -translate-x-1/2 w-3 h-1 bg-black rounded-full"></div>
+                    </div>
+                    <!-- 头发 -->
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 w-12 h-6 bg-black rounded-t-lg"></div>
+                    <!-- 身体 - 背心 -->
+                    <div class="absolute top-10 left-1/2 transform -translate-x-1/2 w-12 h-14 bg-player2 rounded-t-md border-2 border-black"></div>
+                    <!-- 肌肉手臂 -->
+                    <div class="absolute top-12 left-0 w-7 h-5 bg-amber-700 border-2 border-black rounded-full"></div>
+                    <div class="absolute top-12 right-0 w-7 h-5 bg-amber-700 border-2 border-black rounded-full"></div>
+                    <!-- 手套 -->
+                    <div class="absolute top-11 left-[-8px] w-6 h-6 bg-player2Accent border-2 border-black rounded-full"></div>
+                    <div class="absolute top-11 right-[-8px] w-6 h-6 bg-player2Accent border-2 border-black rounded-full"></div>
+                    <!-- 腿部 -->
+                    <div class="absolute bottom-0 left-2 w-5 h-8 bg-gray-800 border-2 border-black rounded"></div>
+                    <div class="absolute bottom-0 right-2 w-5 h-8 bg-gray-800 border-2 border-black rounded"></div>
+                </div>
+            </div>
+            
+            <!-- 特效元素 -->
+            <div id="impact-effect" class="hidden absolute w-16 h-16 bg-yellow-500 rounded-full opacity-70 z-20"></div>
+            <div id="hit-sparks" class="hidden absolute z-20"></div>
+            <div id="special-effect" class="hidden absolute w-40 h-40 rounded-full z-20"></div>
+            <div id="power-up-effect" class="hidden absolute w-20 h-20 bg-yellow-300 rounded-full opacity-60 z-20"></div>
+            
+            <!-- 倒计时和过渡元素 -->
+            <div id="countdown" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-6xl font-bold z-30"></div>
+        </div>
+        
+        <!-- 游戏控制和信息 -->
+        <div class="mt-6 grid grid-cols-3 gap-4 text-gray-400 text-sm">
+            <div>
+                <p class="font-bold text-white mb-1">游戏目标</p>
+                <p>击败对手获得分数，赢得3回合胜利</p>
+            </div>
+            <div class="text-center">
+                <p class="font-bold text-white mb-1">特殊技能</p>
+                <p>积累能量释放强力大招，造成大量伤害</p>
+            </div>
+            <div class="text-right">
+                <p class="font-bold text-white mb-1">道具系统</p>
+                <p>收集空中道具获取生命值和能量值</p>
+            </div>
+            <div class="col-span-3 text-center mt-2">
+                <button id="restart-btn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-full transition">
+                    <i class="fa fa-refresh mr-1"></i>重新开始游戏
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏菜单模态框 -->
+    <div id="menu-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md text-center">
+            <h2 class="text-2xl font-bold text-white mb-4">游戏菜单</h2>
+            <div class="flex flex-col gap-3 mb-6">
+                <button id="resume-btn" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded transition">
+                    继续游戏
+                </button>
+                <button id="new-game-btn" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded transition">
+                    新游戏
+                </button>
+                <button id="how-to-play-btn" class="bg-gray-600 hover:bg-gray-500 text-white py-2 px-4 rounded transition">
+                    游戏说明
+                </button>
+            </div>
+            <button id="close-menu-btn" class="bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition">
+                关闭
+            </button>
+        </div>
+    </div>
+
+    <!-- 游戏说明模态框 -->
+    <div id="instructions-modal" class="fixed inset-0 bg-black bg-opacity-70 z-50 hidden items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md text-left overflow-y-auto max-h-[80vh]">
+            <h2 class="text-2xl font-bold text-white mb-4">游戏说明</h2>
+            <div class="text-gray-300 space-y-4">
+                <div>
+                    <h3 class="font-bold text-white mb-1">基本操作</h3>
+                    <p>玩家1和玩家2分别控制各自角色进行对战，先击败对手3次者获胜</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white mb-1">控制方式</h3>
+                    <p><span class="text-player1">玩家1</span>：A(左)、D(右)、J(攻击)、S(防御)、W(跳跃)、K(大招)</p>
+                    <p><span class="text-player2">玩家2</span>：←(左)、→(右)、1(攻击)、↓(防御)、↑(跳跃)、2(大招)</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white mb-1">游戏系统</h3>
+                    <p>• 攻击对手积累能量，能量满后可释放大招</p>
+                    <p>• 击败对手获得1分，先获得3分者胜利</p>
+                    <p>• 场景中会随机出现道具，拾取可获得增益</p>
+                    <p>• 随着关卡提升，对手强度会增加</p>
+                </div>
+            </div>
+            <button id="close-instructions-btn" class="mt-6 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded transition">
+                关闭
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏音效 (使用Web Audio API模拟)
+        const soundEffects = {
+            attack: { enabled: true },
+            hit: { enabled: true },
+            special: { enabled: true },
+            jump: { enabled: true },
+            powerup: { enabled: true },
+            round: { enabled: true },
+            win: { enabled: true }
+        };
+        
+        // 播放音效函数
+        function playSound(effect) {
+            if (soundEffects[effect].enabled) {
+                // 这里使用Web Audio API创建简单音效
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                
+                // 根据不同音效设置不同参数
+                switch(effect) {
+                    case 'attack':
+                        oscillator.type = 'square';
+                        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.2);
+                        break;
+                    case 'hit':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(220, audioCtx.currentTime);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.3);
+                        break;
+                    case 'special':
+                        oscillator.type = 'sawtooth';
+                        oscillator.frequency.setValueAtTime(550, audioCtx.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(220, audioCtx.currentTime + 0.8);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.8);
+                        break;
+                    case 'jump':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(330, audioCtx.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.2);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.2);
+                        break;
+                    case 'powerup':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(660, audioCtx.currentTime);
+                        oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.5);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.5);
+                        break;
+                    case 'round':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.3);
+                        oscillator.frequency.setValueAtTime(1320, audioCtx.currentTime + 0.6);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.9);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 0.9);
+                        break;
+                    case 'win':
+                        oscillator.type = 'sine';
+                        oscillator.frequency.setValueAtTime(550, audioCtx.currentTime);
+                        oscillator.frequency.setValueAtTime(660, audioCtx.currentTime + 0.4);
+                        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime + 0.8);
+                        oscillator.frequency.setValueAtTime(1100, audioCtx.currentTime + 1.2);
+                        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.6);
+                        oscillator.start();
+                        oscillator.stop(audioCtx.currentTime + 1.6);
+                        break;
+                }
+            }
+        }
+        
+        // DOM元素获取
+        const player1 = document.getElementById('player1');
+        const player2 = document.getElementById('player2');
+        const player1Weapon = document.getElementById('player1-weapon');
+        const player1Health = document.getElementById('player1-health');
+        const player2Health = document.getElementById('player2-health');
+        const player1Energy = document.getElementById('player1-energy');
+        const player2Energy = document.getElementById('player2-energy');
+        const player1Score = document.getElementById('player1-score');
+        const player2Score = document.getElementById('player2-score');
+        const message = document.getElementById('message');
+        const roundDisplay = document.getElementById('round');
+        const levelDisplay = document.getElementById('level');
+        const impactEffect = document.getElementById('impact-effect');
+        const hitSparks = document.getElementById('hit-sparks');
+        const specialEffect = document.getElementById('special-effect');
+        const powerUpEffect = document.getElementById('power-up-effect');
+        const energyItem = document.getElementById('energy-item');
+        const healthItem = document.getElementById('health-item');
+        const countdown = document.getElementById('countdown');
+        const arena = document.getElementById('arena');
+        const restartBtn = document.getElementById('restart-btn');
+        const soundBtn = document.getElementById('sound-btn');
+        const menuBtn = document.getElementById('menu-btn');
+        const menuModal = document.getElementById('menu-modal');
+        const closeMenuBtn = document.getElementById('close-menu-btn');
+        const resumeBtn = document.getElementById('resume-btn');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const howToPlayBtn = document.getElementById('how-to-play-btn');
+        const instructionsModal = document.getElementById('instructions-modal');
+        const closeInstructionsBtn = document.getElementById('close-instructions-btn');
+        
+        // 游戏状态
+        let gameState = {
+            player1: {
+                health: 100,
+                energy: 0,
+                score: 0,
+                isDefending: false,
+                isAttacking: false,
+                isUsingSpecial: false,
+                isJumping: false,
+                isMovingLeft: false,
+                isMovingRight: false,
+                position: 20 // 初始位置百分比
+            },
+            player2: {
+                health: 100,
+                energy: 0,
+                score: 0,
+                isDefending: false,
+                isAttacking: false,
+                isUsingSpecial: false,
+                isJumping: false,
+                isMovingLeft: false,
+                isMovingRight: false,
+                position: 80 // 初始位置百分比
+            },
+            game: {
+                round: 1,
+                level: 1,
+                isPaused: false,
+                isGameOver: false,
+                isRoundOver: false,
+                itemSpawnTimer: 0,
+                itemSpawnInterval: 10000, // 10秒生成一个道具
+                lastItemTime: 0
+            }
+        };
+        
+        // 游戏参数
+        const moveSpeed = 0.5;
+        const minPosition = 5; // 最左位置百分比
+        const maxPosition = 95; // 最右位置百分比
+        const attackRange = 15; // 攻击有效范围百分比
+        const energyPerHit = 10; // 每次攻击获得的能量
+        const maxEnergy = 100; // 最大能量值
+        const specialAttackCost = 100; // 大招消耗的能量
+        const roundsToWin = 3; // 获胜所需回合数
+        
+        // 创建击中火花效果
+        function createSparks(x, y) {
+            // 清空之前的火花
+            hitSparks.innerHTML = '';
+            hitSparks.style.left = `${x}px`;
+            hitSparks.style.top = `${y}px`;
+            hitSparks.classList.remove('hidden');
+            
+            // 创建8个火花粒子
+            for (let i = 0; i < 8; i++) {
+                const spark = document.createElement('div');
+                const size = Math.random() * 6 + 3;
+                const angle = (i / 8) * Math.PI * 2;
+                const distance = Math.random() * 15 + 5;
+                
+                spark.style.position = 'absolute';
+                spark.style.width = `${size}px`;
+                spark.style.height = `${size}px`;
+                spark.style.backgroundColor = i % 2 === 0 ? '#FFD700' : '#FF6B35';
+                spark.style.borderRadius = '50%';
+                spark.style.left = '0';
+                spark.style.top = '0';
+                spark.style.opacity = '0.8';
+                spark.style.transform = `translate(0, 0)`;
+                spark.style.transition = `transform 0.5s ease-out, opacity 0.5s ease-out`;
+                
+                hitSparks.appendChild(spark);
+                
+                // 触发火花动画
+                setTimeout(() => {
+                    spark.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+                    spark.style.opacity = '0';
+                }, 10);
+            }
+            
+            // 一段时间后隐藏火花容器
+            setTimeout(() => {
+                hitSparks.classList.add('hidden');
+            }, 600);
+        }
+        
+        // 更新角色位置
+        function updatePosition() {
+            if (gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) return;
+            
+            // 更新玩家1位置
+            if (gameState.player1.isMovingLeft && !gameState.player1.isAttacking && !gameState.player1.isUsingSpecial && !gameState.player1.isJumping) {
+                gameState.player1.position = Math.max(minPosition, gameState.player1.position - moveSpeed);
+                player1.classList.add('walk-animation');
+            } else if (gameState.player1.isMovingRight && !gameState.player1.isAttacking && !gameState.player1.isUsingSpecial && !gameState.player1.isJumping) {
+                gameState.player1.position = Math.min(maxPosition, gameState.player1.position + moveSpeed);
+                player1.classList.add('walk-animation');
+            } else {
+                player1.classList.remove('walk-animation');
+            }
+            
+            // 更新玩家2位置
+            if (gameState.player2.isMovingLeft && !gameState.player2.isAttacking && !gameState.player2.isUsingSpecial && !gameState.player2.isJumping) {
+                gameState.player2.position = Math.max(minPosition, gameState.player2.position - moveSpeed);
+                player2.classList.add('walk-animation');
+            } else if (gameState.player2.isMovingRight && !gameState.player2.isAttacking && !gameState.player2.isUsingSpecial && !gameState.player2.isJumping) {
+                gameState.player2.position = Math.min(maxPosition, gameState.player2.position + moveSpeed);
+                player2.classList.add('walk-animation');
+            } else {
+                player2.classList.remove('walk-animation');
+            }
+            
+            // 应用位置
+            player1.style.left = `${gameState.player1.position}%`;
+            player2.style.left = `${gameState.player2.position}%`;
+            
+            // 检查道具碰撞
+            checkItemCollection();
+            
+            // 道具生成逻辑
+            updateItemSpawning();
+            
+            // 继续动画循环
+            requestAnimationFrame(updatePosition);
+        }
+        
+        // 检查两个角色是否在攻击范围内
+        function isInAttackRange(attacker, defender) {
+            const distance = Math.abs(attacker.position - defender.position);
+            return distance <= attackRange;
+        }
+        
+        // 普通攻击函数
+        function attack(attacker, defender) {
+            // 检查是否正在攻击或游戏状态
+            if ((attacker === player1 && (gameState.player1.isAttacking || gameState.player1.isUsingSpecial)) || 
+                (attacker === player2 && (gameState.player2.isAttacking || gameState.player2.isUsingSpecial)) ||
+                gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) {
+                return;
+            }
+            
+            // 获取游戏状态中的攻击者和防御者
+            const attackerState = attacker === player1 ? gameState.player1 : gameState.player2;
+            const defenderState = defender === player1 ? gameState.player1 : gameState.player2;
+            
+            // 检查是否在攻击范围内
+            if (!isInAttackRange(attackerState, defenderState)) {
+                message.textContent = "距离太远，攻击不到！";
+                return;
+            }
+            
+            // 播放攻击音效
+            playSound('attack');
+            
+            // 设置攻击状态
+            attackerState.isAttacking = true;
+            
+            // 武器动画 - 玩家1的剑
+            if (attacker === player1) {
+                player1Weapon.style.transform = "rotate(-30deg) translate(5px, -5px)";
+            }
+            
+            // 添加攻击动画
+            attacker.classList.add(attacker === player1 ? 'player1-attack' : 'player2-attack');
+            
+            // 获取角色位置信息
+            const attackerRect = attacker.getBoundingClientRect();
+            const defenderRect = defender.getBoundingClientRect();
+            const arenaRect = arena.getBoundingClientRect();
+            
+            // 计算击中位置 (防御者身体中间)
+            const hitX = defenderRect.left + defenderRect.width / 2 - arenaRect.left;
+            const hitY = defenderRect.top + defenderRect.height / 2 - arenaRect.top;
+            
+            // 显示击中效果
+            setTimeout(() => {
+                // 显示撞击效果
+                impactEffect.style.left = `${hitX - 16}px`;
+                impactEffect.style.top = `${hitY - 16}px`;
+                impactEffect.classList.remove('hidden');
+                impactEffect.classList.add('hit-impact');
+                
+                // 创建火花效果
+                createSparks(hitX, hitY);
+                
+                // 播放击中音效
+                playSound('hit');
+                
+                // 效果结束后隐藏
+                setTimeout(() => {
+                    impactEffect.classList.remove('hit-impact');
+                    impactEffect.classList.add('hidden');
+                }, 300);
+            }, 120); // 攻击动画进行到120ms时显示击中效果
+            
+            // 检查防御状态，计算伤害
+            const isDefending = defender === player1 ? gameState.player1.isDefending : gameState.player2.isDefending;
+            const damage = isDefending ? 5 : 10 + Math.floor(gameState.game.level * 2); // 随等级提升伤害
+            
+            // 增加攻击者能量
+            attackerState.energy = Math.min(maxEnergy, attackerState.energy + energyPerHit);
+            updateEnergy(attacker === player1 ? player1Energy : player2Energy, attackerState.energy);
+            
+            // 应用伤害和被击中反应
+            setTimeout(() => {
+                if (defender === player1) {
+                    gameState.player1.health = Math.max(0, gameState.player1.health - damage);
+                    updateHealth(player1Health, gameState.player1.health);
+                    
+                    // 如果没有防御，添加被击中动画
+                    if (!isDefending) {
+                        defender.classList.add('hit-reaction');
+                    }
+                    
+                    message.textContent = isDefending ? "玩家1挡住了攻击！" : `玩家2击中了玩家1！(-${damage}HP)`;
+                } else {
+                    gameState.player2.health = Math.max(0, gameState.player2.health - damage);
+                    updateHealth(player2Health, gameState.player2.health);
+                    
+                    // 如果没有防御，添加被击中动画
+                    if (!isDefending) {
+                        defender.classList.add('hit-reaction');
+                    }
+                    
+                    message.textContent = isDefending ? "玩家2挡住了攻击！" : `玩家1击中了玩家2！(-${damage}HP)`;
+                }
+                
+                // 检查回合是否结束
+                checkRoundOver();
+            }, 150); // 稍微延迟，让视觉效果更连贯
+            
+            // 移除动画和状态
+            setTimeout(() => {
+                attacker.classList.remove(attacker === player1 ? 'player1-attack' : 'player2-attack');
+                defender.classList.remove('hit-reaction');
+                attackerState.isAttacking = false;
+                
+                // 重置武器位置
+                if (attacker === player1) {
+                    player1Weapon.style.transform = "rotate(0) translate(0, 0)";
+                }
+            }, 400);
+        }
+        
+        // 特殊攻击函数
+        function specialAttack(attacker, defender) {
+            // 检查是否可以使用特殊攻击
+            if ((attacker === player1 && (gameState.player1.isAttacking || gameState.player1.isUsingSpecial || gameState.player1.energy < specialAttackCost)) || 
+                (attacker === player2 && (gameState.player2.isAttacking || gameState.player2.isUsingSpecial || gameState.player2.energy < specialAttackCost)) ||
+                gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) {
+                if ((attacker === player1 && gameState.player1.energy < specialAttackCost) || 
+                    (attacker === player2 && gameState.player2.energy < specialAttackCost)) {
+                    message.textContent = "能量不足，无法使用大招！";
+                }
+                return;
+            }
+            
+            // 获取游戏状态中的攻击者和防御者
+            const attackerState = attacker === player1 ? gameState.player1 : gameState.player2;
+            const defenderState = defender === player1 ? gameState.player1 : gameState.player2;
+            
+            // 检查是否在攻击范围内 (特殊攻击范围更大)
+            const distance = Math.abs(attackerState.position - defenderState.position);
+            if (distance > attackRange + 10) {
+                message.textContent = "距离太远，特殊攻击无法命中！";
+                return;
+            }
+            
+            // 播放特殊攻击音效
+            playSound('special');
+            
+            // 设置特殊攻击状态
+            attackerState.isUsingSpecial = true;
+            attackerState.energy = 0; // 消耗所有能量
+            updateEnergy(attacker === player1 ? player1Energy : player2Energy, 0);
+            
+            // 添加攻击动画
+            attacker.classList.add(attacker === player1 ? 'player1-attack' : 'player2-attack');
+            
+            // 获取角色位置信息
+            const attackerRect = attacker.getBoundingClientRect();
+            const defenderRect = defender.getBoundingClientRect();
+            const arenaRect = arena.getBoundingClientRect();
+            
+            // 计算击中位置
+            const hitX = defenderRect.left + defenderRect.width / 2 - arenaRect.left;
+            const hitY = defenderRect.top + defenderRect.height / 2 - arenaRect.top;
+            
+            // 显示特殊攻击效果
+            setTimeout(() => {
+                // 设置特殊效果颜色和位置
+                specialEffect.style.left = `${hitX - 40}px`;
+                specialEffect.style.top = `${hitY - 40}px`;
+                specialEffect.style.backgroundColor = attacker === player1 ? 'rgba(59, 130, 246, 0.6)' : 'rgba(239, 68, 68, 0.6)';
+                specialEffect.classList.remove('hidden');
+                specialEffect.classList.add('special-effect');
+                
+                // 创建火花效果
+                createSparks(hitX, hitY);
+                
+                // 播放击中音效
+                playSound('hit');
+                
+                // 效果结束后隐藏
+                setTimeout(() => {
+                    specialEffect.classList.remove('special-effect');
+                    specialEffect.classList.add('hidden');
+                }, 800);
+            }, 200);
+            
+            // 计算特殊攻击伤害 (无视部分防御)
+            const isDefending = defender === player1 ? gameState.player1.isDefending : gameState.player2.isDefending;
+            const damage = isDefending ? 20 : 30 + Math.floor(gameState.game.level * 5); // 随等级提升伤害
+            
+            // 应用伤害和被击中反应
+            setTimeout(() => {
+                if (defender === player1) {
+                    gameState.player1.health = Math.max(0, gameState.player1.health - damage);
+                    updateHealth(player1Health, gameState.player1.health);
+                    defender.classList.add('hit-reaction');
+                    message.textContent = `玩家2使用了大招！玩家1受到${damage}点伤害！`;
+                } else {
+                    gameState.player2.health = Math.max(0, gameState.player2.health - damage);
+                    updateHealth(player2Health, gameState.player2.health);
+                    defender.classList.add('hit-reaction');
+                    message.textContent = `玩家1使用了大招！玩家2受到${damage}点伤害！`;
+                }
+                
+                // 检查回合是否结束
+                checkRoundOver();
+            }, 300);
+            
+            // 移除动画和状态
+            setTimeout(() => {
+                attacker.classList.remove(attacker === player1 ? 'player1-attack' : 'player2-attack');
+                defender.classList.remove('hit-reaction');
+                attackerState.isUsingSpecial = false;
+            }, 800);
+        }
+        
+        // 防御函数
+        function toggleDefend(player, isDefending) {
+            if (gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) return;
+            
+            if (player === player1) {
+                gameState.player1.isDefending = isDefending;
+                // 防御时调整剑的位置
+                if (isDefending) {
+                    player1Weapon.style.transform = "rotate(70deg) translate(-5px, -3px)";
+                } else {
+                    player1Weapon.style.transform = "rotate(0) translate(0, 0)";
+                }
+            } else {
+                gameState.player2.isDefending = isDefending;
+            }
+            
+            if (isDefending) {
+                player.classList.add('defend-effect');
+                message.textContent = player === player1 ? "玩家1正在防御！" : "玩家2正在防御！";
+            } else {
+                player.classList.remove('defend-effect');
+            }
+        }
+        
+        // 跳跃函数
+        function jump(player) {
+            const playerState = player === player1 ? gameState.player1 : gameState.player2;
+            
+            if ((playerState.isJumping || playerState.isAttacking || playerState.isUsingSpecial) || 
+                gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) {
+                return;
+            }
+            
+            // 播放跳跃音效
+            playSound('jump');
+            
+            playerState.isJumping = true;
+            player.classList.add('jump-effect');
+            message.textContent = player === player1 ? "玩家1跳起来了！" : "玩家2跳起来了！";
+            
+            setTimeout(() => {
+                player.classList.remove('jump-effect');
+                playerState.isJumping = false;
+            }, 500);
+        }
+        
+        // 更新生命值显示
+        function updateHealth(healthBar, value) {
+            healthBar.style.width = `${value}%`;
+            
+            // 生命值低时添加警告颜色
+            if (value < 30) {
+                healthBar.classList.add('animate-pulse');
+            } else {
+                healthBar.classList.remove('animate-pulse');
+            }
+        }
+        
+        // 更新能量值显示
+        function updateEnergy(energyBar, value) {
+            energyBar.style.width = `${value}%`;
+        }
+        
+        // 更新分数显示
+        function updateScores() {
+            player1Score.textContent = `${gameState.player1.score}分`;
+            player2Score.textContent = `${gameState.player2.score}分`;
+        }
+        
+        // 检查回合是否结束
+        function checkRoundOver() {
+            if (gameState.game.isRoundOver) return;
+            
+            if (gameState.player1.health <= 0) {
+                // 玩家2获胜
+                gameState.player2.score++;
+                gameState.game.isRoundOver = true;
+                updateScores();
+                message.textContent = "玩家2赢得了这一回合！";
+                playSound('round');
+                checkGameOver();
+                setTimeout(nextRound, 3000);
+            } else if (gameState.player2.health <= 0) {
+                // 玩家1获胜
+                gameState.player1.score++;
+                gameState.game.isRoundOver = true;
+                updateScores();
+                message.textContent = "玩家1赢得了这一回合！";
+                playSound('round');
+                checkGameOver();
+                setTimeout(nextRound, 3000);
+            }
+        }
+        
+        // 检查游戏是否结束
+        function checkGameOver() {
+            if (gameState.player1.score >= roundsToWin) {
+                gameState.game.isGameOver = true;
+                message.textContent = "游戏结束！玩家1获得最终胜利！";
+                playSound('win');
+            } else if (gameState.player2.score >= roundsToWin) {
+                gameState.game.isGameOver = true;
+                message.textContent = "游戏结束！玩家2获得最终胜利！";
+                playSound('win');
+            }
+        }
+        
+        // 下一轮
+        function nextRound() {
+            if (gameState.game.isGameOver) return;
+            
+            // 增加回合数
+            gameState.game.round++;
+            
+            // 每3回合提升一级
+            if (gameState.game.round % 3 === 1) {
+                gameState.game.level++;
+                levelDisplay.textContent = `Level ${gameState.game.level}`;
+                
+                // 改变场景
+                arena.classList.remove('arena-gradient-1', 'arena-gradient-2', 'arena-gradient-3');
+                const arenaClass = `arena-gradient-${(gameState.game.level % 3) || 3}`;
+                arena.classList.add(arenaClass);
+                arena.classList.add('level-transition');
+                setTimeout(() => {
+                    arena.classList.remove('level-transition');
+                }, 1000);
+            }
+            
+            // 更新回合显示
+            roundDisplay.textContent = `第${gameState.game.round}回合`;
+            
+            // 重置角色状态
+            resetCharacters();
+            
+            // 隐藏道具
+            energyItem.classList.add('hidden');
+            healthItem.classList.add('hidden');
+            
+            // 重置回合状态
+            gameState.game.isRoundOver = false;
+            
+            // 显示倒计时
+            showCountdown();
+            
+            // 确保位置更新循环继续运行
+            requestAnimationFrame(updatePosition);
+        }
+        
+        // 显示倒计时
+        function showCountdown() {
+            countdown.classList.remove('hidden');
+            countdown.classList.add('countdown');
+            
+            let count = 3;
+            countdown.textContent = count;
+            
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdown.textContent = count;
+                    countdown.classList.remove('countdown');
+                    // 触发重绘
+                    void countdown.offsetWidth;
+                    countdown.classList.add('countdown');
+                } else {
+                    clearInterval(countdownInterval);
+                    countdown.classList.add('hidden');
+                    countdown.classList.remove('countdown');
+                    message.textContent = "战斗开始！";
+                    
+                    // 倒计时结束后确保角色可以移动
+                    gameState.player1.isMovingLeft = false;
+                    gameState.player1.isMovingRight = false;
+                    gameState.player2.isMovingLeft = false;
+                    gameState.player2.isMovingRight = false;
+                }
+            }, 1000);
+        }
+        
+        // 重置角色状态
+        function resetCharacters() {
+            // 重置生命值
+            gameState.player1.health = 100;
+            gameState.player2.health = 100;
+            updateHealth(player1Health, 100);
+            updateHealth(player2Health, 100);
+            
+            // 重置能量
+            gameState.player1.energy = 0;
+            gameState.player2.energy = 0;
+            updateEnergy(player1Energy, 0);
+            updateEnergy(player2Energy, 0);
+            
+            // 重置位置
+            gameState.player1.position = 20;
+            gameState.player2.position = 80;
+            player1.style.left = `${gameState.player1.position}%`;
+            player2.style.left = `${gameState.player2.position}%`;
+            
+            // 重置武器位置
+            player1Weapon.style.transform = "rotate(0) translate(0, 0)";
+            
+            // 重置所有动作状态
+            gameState.player1 = {
+                ...gameState.player1,
+                isDefending: false,
+                isAttacking: false,
+                isUsingSpecial: false,
+                isJumping: false,
+                isMovingLeft: false,
+                isMovingRight: false
+            };
+            
+            gameState.player2 = {
+                ...gameState.player2,
+                isDefending: false,
+                isAttacking: false,
+                isUsingSpecial: false,
+                isJumping: false,
+                isMovingLeft: false,
+                isMovingRight: false
+            };
+            
+            // 移除所有效果类
+            player1.classList.remove('defend-effect', 'hit-reaction', 'player1-attack', 'opacity-50', 'walk-animation');
+            player2.classList.remove('defend-effect', 'hit-reaction', 'player2-attack', 'opacity-50', 'walk-animation');
+            
+            // 隐藏特效
+            impactEffect.classList.add('hidden');
+            hitSparks.classList.add('hidden');
+            specialEffect.classList.add('hidden');
+        }
+        
+        // 重置游戏
+        function resetGame() {
+            // 重置分数和回合
+            gameState.player1.score = 0;
+            gameState.player2.score = 0;
+            gameState.game.round = 1;
+            gameState.game.level = 1;
+            
+            // 更新显示
+            roundDisplay.textContent = `第${gameState.game.round}回合`;
+            levelDisplay.textContent = `Level ${gameState.game.level}`;
+            updateScores();
+            
+            // 重置场景
+            arena.classList.remove('arena-gradient-1', 'arena-gradient-2', 'arena-gradient-3');
+            arena.classList.add('arena-gradient-1');
+            
+            // 重置游戏状态
+            gameState.game.isGameOver = false;
+            gameState.game.isPaused = false;
+            
+            // 隐藏模态框
+            menuModal.classList.add('hidden');
+            menuModal.classList.remove('flex');
+            instructionsModal.classList.add('hidden');
+            instructionsModal.classList.remove('flex');
+            
+            // 重置角色
+            resetCharacters();
+            
+            // 显示倒计时
+            showCountdown();
+        }
+        
+        // 更新道具生成 - 调整了道具Y轴位置
+        function updateItemSpawning() {
+            const now = Date.now();
+            
+            // 检查是否到了生成新道具的时间
+            if (!gameState.game.isRoundOver && !gameState.game.isGameOver && 
+                !gameState.game.isPaused && now - gameState.game.lastItemTime > gameState.game.itemSpawnInterval) {
+                
+                // 随机选择生成能量道具或生命道具
+                const spawnEnergy = Math.random() > 0.5;
+                
+                // 随机位置
+                const posX = Math.floor(Math.random() * 80) + 10; // 10%到90%之间
+                // 调整Y轴位置，从原来的50-150px改为80-130px，降低了高度
+                const posY = Math.floor(Math.random() * 50) + 80; // 80px到130px之间
+                
+                if (spawnEnergy) {
+                    energyItem.style.left = `${posX}%`;
+                    energyItem.style.top = `${posY}px`;
+                    energyItem.classList.remove('hidden');
+                    healthItem.classList.add('hidden');
+                } else {
+                    healthItem.style.left = `${posX}%`;
+                    healthItem.style.top = `${posY}px`;
+                    healthItem.classList.remove('hidden');
+                    energyItem.classList.add('hidden');
+                }
+                
+                // 更新最后生成时间
+                gameState.game.lastItemTime = now;
+                
+                // 10秒后如果没被拾取，自动消失
+                setTimeout(() => {
+                    if (!gameState.game.isRoundOver && !gameState.game.isGameOver) {
+                        energyItem.classList.add('hidden');
+                        healthItem.classList.add('hidden');
+                    }
+                }, 10000);
+            }
+        }
+        
+        // 检查道具收集
+        function checkItemCollection() {
+            // 如果道具没显示，直接返回
+            if (energyItem.classList.contains('hidden') && healthItem.classList.contains('hidden')) {
+                return;
+            }
+            
+            // 获取角色和道具位置
+            const player1Rect = player1.getBoundingClientRect();
+            const player2Rect = player2.getBoundingClientRect();
+            const energyItemRect = energyItem.getBoundingClientRect();
+            const healthItemRect = healthItem.getBoundingClientRect();
+            
+            // 检查玩家1是否收集到道具
+            if (!energyItem.classList.contains('hidden') && checkCollision(player1Rect, energyItemRect)) {
+                // 收集能量道具
+                gameState.player1.energy = Math.min(maxEnergy, gameState.player1.energy + 30);
+                updateEnergy(player1Energy, gameState.player1.energy);
+                energyItem.classList.add('hidden');
+                showPowerUpEffect(player1Rect.left + player1Rect.width/2, player1Rect.top + player1Rect.height/2);
+                message.textContent = "玩家1获得了能量道具！";
+                playSound('powerup');
+            } else if (!healthItem.classList.contains('hidden') && checkCollision(player1Rect, healthItemRect)) {
+                // 收集生命道具
+                gameState.player1.health = Math.min(100, gameState.player1.health + 20);
+                updateHealth(player1Health, gameState.player1.health);
+                healthItem.classList.add('hidden');
+                showPowerUpEffect(player1Rect.left + player1Rect.width/2, player1Rect.top + player1Rect.height/2);
+                message.textContent = "玩家1获得了生命道具！";
+                playSound('powerup');
+            }
+            
+            // 检查玩家2是否收集到道具
+            if (!energyItem.classList.contains('hidden') && checkCollision(player2Rect, energyItemRect)) {
+                // 收集能量道具
+                gameState.player2.energy = Math.min(maxEnergy, gameState.player2.energy + 30);
+                updateEnergy(player2Energy, gameState.player2.energy);
+                energyItem.classList.add('hidden');
+                showPowerUpEffect(player2Rect.left + player2Rect.width/2, player2Rect.top + player2Rect.height/2);
+                message.textContent = "玩家2获得了能量道具！";
+                playSound('powerup');
+            } else if (!healthItem.classList.contains('hidden') && checkCollision(player2Rect, healthItemRect)) {
+                // 收集生命道具
+                gameState.player2.health = Math.min(100, gameState.player2.health + 20);
+                updateHealth(player2Health, gameState.player2.health);
+                healthItem.classList.add('hidden');
+                showPowerUpEffect(player2Rect.left + player2Rect.width/2, player2Rect.top + player2Rect.height/2);
+                message.textContent = "玩家2获得了生命道具！";
+                playSound('powerup');
+            }
+        }
+        
+        // 检查碰撞
+        function checkCollision(rect1, rect2) {
+            return rect1.left < rect2.right &&
+                   rect1.right > rect2.left &&
+                   rect1.top < rect2.bottom &&
+                   rect1.bottom > rect2.top;
+        }
+        
+        // 显示道具拾取效果
+        function showPowerUpEffect(x, y) {
+            const arenaRect = arena.getBoundingClientRect();
+            const relativeX = x - arenaRect.left;
+            const relativeY = y - arenaRect.top;
+            
+            powerUpEffect.style.left = `${relativeX - 20}px`;
+            powerUpEffect.style.top = `${relativeY - 20}px`;
+            powerUpEffect.classList.remove('hidden');
+            
+            setTimeout(() => {
+                powerUpEffect.classList.add('hidden');
+            }, 500);
+        }
+        
+        // 切换音效
+        function toggleSound() {
+            const isEnabled = soundEffects.attack.enabled;
+            
+            // 切换所有音效状态
+            Object.keys(soundEffects).forEach(key => {
+                soundEffects[key].enabled = !isEnabled;
+            });
+            
+            // 更新按钮显示
+            if (isEnabled) {
+                soundBtn.innerHTML = '<i class="fa fa-volume-off mr-1"></i>音效';
+                soundBtn.classList.remove('bg-gray-700');
+                soundBtn.classList.add('bg-gray-500');
+            } else {
+                soundBtn.innerHTML = '<i class="fa fa-volume-up mr-1"></i>音效';
+                soundBtn.classList.remove('bg-gray-500');
+                soundBtn.classList.add('bg-gray-700');
+            }
+        }
+        
+        // 切换游戏暂停
+        function togglePause() {
+            gameState.game.isPaused = !gameState.game.isPaused;
+            
+            if (gameState.game.isPaused) {
+                message.textContent = "游戏已暂停";
+                menuModal.classList.remove('hidden');
+                menuModal.classList.add('flex');
+            } else {
+                menuModal.classList.add('hidden');
+                menuModal.classList.remove('flex');
+                message.textContent = "战斗继续！";
+                // 确保暂停后恢复移动功能
+                requestAnimationFrame(updatePosition);
+            }
+        }
+        
+        // 键盘控制 - 按下
+        document.addEventListener('keydown', (e) => {
+            if (gameState.game.isPaused || gameState.game.isGameOver || gameState.game.isRoundOver) return;
+            
+            switch(e.key) {
+                // 玩家1控制
+                case 'a':
+                case 'A':
+                    gameState.player1.isMovingLeft = true;
+                    break;
+                case 'd':
+                case 'D':
+                    gameState.player1.isMovingRight = true;
+                    break;
+                case 'j':
+                case 'J':
+                    attack(player1, player2);
+                    break;
+                case 's':
+                case 'S':
+                    toggleDefend(player1, true);
+                    break;
+                case 'w':
+                case 'W':
+                    jump(player1);
+                    break;
+                case 'k':
+                case 'K':
+                    specialAttack(player1, player2);
+                    break;
+                    
+                // 玩家2控制
+                case 'ArrowLeft':
+                    gameState.player2.isMovingLeft = true;
+                    break;
+                case 'ArrowRight':
+                    gameState.player2.isMovingRight = true;
+                    break;
+                case '1':
+                    attack(player2, player1);
+                    break;
+                case 'ArrowDown':
+                    toggleDefend(player2, true);
+                    break;
+                case 'ArrowUp':
+                    jump(player2);
+                    break;
+                case '2':
+                    specialAttack(player2, player1);
+                    break;
+                    
+                // 游戏控制
+                case 'Escape':
+                    togglePause();
+                    break;
+            }
+        });
+        
+        // 键盘控制 - 释放
+        document.addEventListener('keyup', (e) => {
+            switch(e.key) {
+                // 玩家1控制
+                case 'a':
+                case 'A':
+                    gameState.player1.isMovingLeft = false;
+                    break;
+                case 'd':
+                case 'D':
+                    gameState.player1.isMovingRight = false;
+                    break;
+                case 's':
+                case 'S':
+                    toggleDefend(player1, false);
+                    break;
+                    
+                // 玩家2控制
+                case 'ArrowLeft':
+                    gameState.player2.isMovingLeft = false;
+                    break;
+                case 'ArrowRight':
+                    gameState.player2.isMovingRight = false;
+                    break;
+                case 'ArrowDown':
+                    toggleDefend(player2, false);
+                    break;
+            }
+        });
+        
+        // 按钮事件监听
+        restartBtn.addEventListener('click', resetGame);
+        soundBtn.addEventListener('click', toggleSound);
+        menuBtn.addEventListener('click', togglePause);
+        closeMenuBtn.addEventListener('click', togglePause);
+        resumeBtn.addEventListener('click', togglePause);
+        newGameBtn.addEventListener('click', resetGame);
+        howToPlayBtn.addEventListener('click', () => {
+            menuModal.classList.add('hidden');
+            menuModal.classList.remove('flex');
+            instructionsModal.classList.remove('hidden');
+            instructionsModal.classList.add('flex');
+        });
+        closeInstructionsBtn.addEventListener('click', () => {
+            instructionsModal.classList.add('hidden');
+            instructionsModal.classList.remove('flex');
+            if (gameState.game.isPaused) {
+                menuModal.classList.remove('hidden');
+                menuModal.classList.add('flex');
+            }
+        });
+        
+        // 初始化游戏
+        updateScores();
+        showCountdown();
+        updatePosition();
+    </script>
+</body>
+</html>
+    
